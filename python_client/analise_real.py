@@ -1,61 +1,85 @@
 import cv2
 import numpy as np
 import requests
-import random
 
-# --- CONFIGURAÇÃO ---
-# Se a imagem for escura com bichos claros, use cv2.THRESH_BINARY
-# Se a imagem for clara com bichos escuros, use cv2.THRESH_BINARY_INV
-TIPO_LIMIAR = cv2.THRESH_BINARY
-ARQUIVO_IMAGEM = "python_client/teste.jpg" # O nome da sua foto real
+# --- CONFIGURAÇÕES FINAIS ---
+ARQUIVO_IMAGEM = "python_client/test.jpg"
+AREA_MINIMA = 60       # Tamanho mínimo para ser considerado bicho
+TAMANHO_MEDIO_ALGA = 85 # Aumentei um pouco para ele não exagerar na conta da colônia
 
-def analisar_imagem_real():
-    print(f"📸 Lendo imagem real: {ARQUIVO_IMAGEM}...")
+def analisar_com_mascara():
+    print(f"🚀 Iniciando Análise Focada (Com Máscara) em: {ARQUIVO_IMAGEM}...")
     
-    # 1. Carregar a imagem real
-    imagem = cv2.imread(ARQUIVO_IMAGEM)
-    
-    if imagem is None:
-        print("❌ ERRO: Não achei a imagem! Verifique se o nome está 'teste.jpg' na pasta python_client")
+    img = cv2.imread(ARQUIVO_IMAGEM)
+    if img is None:
+        print("❌ Erro: Imagem não encontrada.")
         return
 
-    # 2. Converter para Tons de Cinza (O computador vê melhor assim)
-    cinza = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+    # Pega altura (h) e largura (w) da imagem
+    h, w = img.shape[:2]
 
-    # 3. Aplicar Limiar (Threshold) para separar o que é bicho do que é fundo
-    # Ajuste o 127 se precisar (0 a 255)
-    _, mascara = cv2.threshold(cinza, 127, 255, TIPO_LIMIAR)
-
-    # 4. Contar os elementos (Análise de Conectividade)
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mascara)
+    # --- NOVIDADE: A MÁSCARA CIRCULAR (Cortador de Biscoito) ---
+    # Cria uma imagem preta vazia
+    mascara_foco = np.zeros((h, w), dtype="uint8")
+    # Desenha um círculo branco no meio (onde queremos olhar)
+    raio = int(h / 2) - 10 
+    cv2.circle(mascara_foco, (w // 2, h // 2), raio, 255, -1)
     
-    # (num_labels conta o fundo também, então subtraímos 1)
-    quantidade_detectada = num_labels - 1
+    # "Apaga" tudo que estiver fora do círculo na imagem original
+    img_focada = cv2.bitwise_and(img, img, mask=mascara_foco)
+
+    # 1. Processamento
+    cinza = cv2.cvtColor(img_focada, cv2.COLOR_BGR2GRAY)
+    suave = cv2.GaussianBlur(cinza, (5, 5), 0)
     
-    print(f"🔬 Análise Concluída: {quantidade_detectada} organismos encontrados.")
+    # 2. Threshold Adaptativo
+    binaria = cv2.adaptiveThreshold(suave, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                    cv2.THRESH_BINARY_INV, 11, 2)
 
-    # 5. Preparar dados para o Java
-    dados_para_api = {
-        "especie": "Amostra Real (Microscópio)",
-        "quantidade": quantidade_detectada,
-        "confiancaIA": random.randint(85, 99), # Simulado por enquanto
-        "localColeta": "Laboratório Kleyton"
-    }
+    # 3. Importante: Aplicar a máscara na binária também para limpar as bordas pretas
+    binaria = cv2.bitwise_and(binaria, binaria, mask=mascara_foco)
 
-    # 6. Enviar para o Java
-    try:
-        url = "http://localhost:8081/analises"
-        resposta = requests.post(url, json=dados_para_api)
+    # 4. Contornos
+    contornos, _ = cv2.findContours(binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    total_organismos = 0
+    img_resultado = img_focada.copy()
+
+    for contorno in contornos:
+        area = cv2.contourArea(contorno)
         
-        if resposta.status_code == 200:
-            print("✅ SUCESSO! Dados enviados para o Dashboard Java.")
-            print("👉 Atualize sua tela: http://localhost:8081")
-        else:
-            print(f"⚠️ Erro ao enviar: {resposta.status_code}")
+        if area > AREA_MINIMA:
+            # Lógica de Colônia
+            quantidade = 1
+            if area > (TAMANHO_MEDIO_ALGA * 1.5):
+                quantidade = int(area / TAMANHO_MEDIO_ALGA)
             
-    except Exception as e:
-        print(f"❌ Erro de conexão: {e}")
+            total_organismos += quantidade
+            
+            # Desenho
+            x, y, w, h = cv2.boundingRect(contorno)
+            cor = (0, 255, 0)
+            if quantidade > 1:
+                cor = (255, 0, 0) # Azul
+                cv2.putText(img_resultado, str(quantidade), (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, cor, 2)
 
-# Executar
+            cv2.rectangle(img_resultado, (x, y), (x + w, y + h), cor, 2)
+
+    # Salvar e Enviar
+    cv2.imwrite("python_client/resultado_analise.jpg", img_resultado)
+    print(f"🔬 Resultado Final: {total_organismos} organismos.")
+
+    try:
+        dados = {
+            "especie": "Nível 3 - Focado",
+            "quantidade": total_organismos,
+            "confiancaIA": 95,
+            "localColeta": "Lab Kleyton"
+        }
+        requests.post("http://localhost:8081/analises", json=dados)
+        print("✅ Dados enviados!")
+    except:
+        pass
+
 if __name__ == "__main__":
-    analisar_imagem_real()
+    analisar_com_mascara()
