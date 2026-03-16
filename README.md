@@ -25,3 +25,4 @@ Comunicação: REST API (HTTP POST)
 
 Como rodar (local)
 Backend
+mvn spring-boot:run
