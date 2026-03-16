@@ -2,9 +2,9 @@
 
 Sistema híbrido de **visão computacional** + **microsserviços** para contagem e análise automatizada de microrganismos (microalgas) em laboratório.
 
-Substitui contagem manual por pipeline inteligente:  
-**Python + OpenCV** → detecção/contornos/métricas  
-**Java + Spring Boot** → API REST + persistência MySQL
+Substitui a contagem manual por pipeline inteligente:  
+**Python + OpenCV** → detecção, contornos e métricas morfométricas  
+**Java + Spring Boot** → API REST + persistência em MySQL
 
 ### Resultados principais
 - Contagem automática: até 500+ indivíduos por imagem  
@@ -15,14 +15,7 @@ Substitui contagem manual por pipeline inteligente:
 ### Arquitetura
 ```mermaid
 graph LR
-    Imagem --> Python/OpenCV --> JSON/POST --> API Spring Boot --> MySQL
-Tecnologias
-
-Backend: Java 17, Spring Boot 3.5 (Web, JPA, Lombok)
-Visão: Python, OpenCV, Pandas
-Banco: MySQL
-Comunicação: REST API (HTTP POST)
-
-Como rodar (local)
-Backend
-mvn spring-boot:run
+    A[Imagem] --> B[Python + OpenCV]
+    B --> C[JSON / HTTP POST]
+    C --> D[API Spring Boot]
+    D --> E[MySQL]
