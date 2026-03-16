@@ -16,3 +16,12 @@ Substitui contagem manual por pipeline inteligente:
 ```mermaid
 graph LR
     Imagem --> Python/OpenCV --> JSON/POST --> API Spring Boot --> MySQL
+Tecnologias
+
+Backend: Java 17, Spring Boot 3.5 (Web, JPA, Lombok)
+Visão: Python, OpenCV, Pandas
+Banco: MySQL
+Comunicação: REST API (HTTP POST)
+
+Como rodar (local)
+Backend
